@@ -1,18 +1,32 @@
-// Nest
-import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common'
 
-// Controllers
-import { GameController } from './game.controller';
+// Nest Modules
+import { TypeOrmModule } from '@nestjs/typeorm'
 
-// Services
-import { GameService } from './game.service';
-import { PrismaService } from 'src/prisma/prisma.service';
+// Service
+import { GameService } from './game.service'
 
-// Gateways
-import { GameGateway } from './game.gateway';
+// Controller
+import { GameController } from './game.controller'
+
+// Gateway
+import { GameGateway } from './game.gateway'
+
+// Modules
+import { CardModule } from 'src/card/card.module'
+import { UserModule } from 'src/user/user.module'
+
+// Entities
+import { Game } from './entities/game.entity'
+import { GameRound } from './entities/round.entity'
 
 @Module({
-  providers: [GameGateway, GameService, PrismaService],
+  imports: [
+    TypeOrmModule.forFeature([Game, GameRound]),
+    CardModule,
+    UserModule,
+  ],
   controllers: [GameController],
+  providers: [GameService, GameGateway],
 })
 export class GameModule {}

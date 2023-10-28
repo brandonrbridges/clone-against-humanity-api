@@ -1,13 +1,19 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+// Nest
+import { NestFactory } from '@nestjs/core'
+
+// Modules
+import { AppModule } from './app.module'
+import { IoAdapter } from '@nestjs/platform-socket.io'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule)
 
   app.enableCors({
-    origin: '*',
-  });
+    origin: ['http://localhost:3000', 'http://192.168.1.126:3000'],
+  })
 
-  await app.listen(3001);
+  app.useWebSocketAdapter(new IoAdapter(app))
+
+  await app.listen(4000, '0.0.0.0')
 }
-bootstrap();
+bootstrap()

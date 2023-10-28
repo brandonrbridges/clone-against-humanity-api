@@ -1,54 +1,64 @@
 // Nest
-import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common'
 
-// Prisma
-import { PrismaService } from 'src/prisma/prisma.service';
+// TypeORM
+import { Repository } from 'typeorm'
+import { InjectRepository } from '@nestjs/typeorm'
+
+// Entities
+import { User } from './entities/user.entity'
+
+// DTOs
+import { CreateUserDto } from './dto/create-user.dto'
+import { UpdateUserDto } from './dto/update-user.dto'
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@InjectRepository(User) private userRepo: Repository<User>) {}
 
-  async createTemporaryUser(username: string): Promise<any> {
-    return await this.prisma.client.user.create({
-      data: {
-        username,
-      },
-    });
+  async create(data: CreateUserDto): Promise<User> {
+    const user = await this.userRepo.save(data)
+
+    return user
   }
 
-  async deleteTemporaryUser(username: string): Promise<any> {
-    const user = await this.getUserByUsername(username);
+  async findAll(): Promise<User[]> {
+    const users = await this.userRepo.find()
+
+    return users
+  }
+
+  async findOne(id: string): Promise<User> {
+    const user = this.userRepo.findOne({
+      where: { id },
+    })
+
+    return user
+  }
+
+  async findOneByUsername(username: string): Promise<User> {
+    const user = await this.userRepo.findOne({
+      where: { username },
+    })
+
+    return user
+  }
+
+  async update(id: string, data: UpdateUserDto) {
+    const user = await this.findOne(id)
 
     if (!user) {
-      return {
-        message: 'User not found',
-      };
+      throw new Error('User not found')
     }
 
-    return await this.prisma.client.user.delete({
-      where: {
-        username,
-      },
-    });
+    await this.userRepo.update(id, data)
+
+    return user
   }
 
-  async getUserByUsername(username: string): Promise<any> {
-    return await this.prisma.client.user.findUnique({
-      where: {
-        username,
-      },
-    });
-  }
+  async remove(id: number): Promise<void> {
+    await this.userRepo.delete(id)
 
-  async getAllUsernames(): Promise<string[]> {
-    const users = await this.prisma.client.user.findMany();
-
-    return users.map((user) => user.username);
-  }
-
-  async isTemporaryUsernameValid(username: string): Promise<boolean> {
-    const user = await this.getUserByUsername(username);
-
-    return !user;
+    return
   }
 }

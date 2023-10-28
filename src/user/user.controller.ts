@@ -1,38 +1,55 @@
 // Nest
 import {
-  BadRequestException,
-  Body,
   Controller,
-  Delete,
+  Get,
   Post,
-} from '@nestjs/common';
+  Body,
+  Patch,
+  Param,
+  Delete,
+  BadRequestException,
+} from '@nestjs/common'
 
-// Services
-import { UserService } from './user.service';
+// Service
+import { UserService } from './user.service'
+
+// Entities
+import { User } from './entities/user.entity'
+
+// DTOs
+import { CreateUserDto } from './dto/create-user.dto'
+import { UpdateUserDto } from './dto/update-user.dto'
 
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Post('temporary')
-  async createTemporaryUser(@Body() body: { username: string }): Promise<any> {
-    const isValid = await this.userService.isTemporaryUsernameValid(
-      body.username,
-    );
+  @Post()
+  async create(@Body() data: CreateUserDto): Promise<User> {
+    const exists = await this.userService.findOneByUsername(data.username)
 
-    if (!isValid) {
-      throw new BadRequestException('Username is already taken');
-    }
+    if (exists) throw new BadRequestException('User already exists')
 
-    return await this.userService.createTemporaryUser(body.username);
+    return this.userService.create(data)
   }
 
-  @Delete('temporary')
-  async deleteTemporaryUser(@Body() body: { username: string }): Promise<any> {
-    await this.userService.deleteTemporaryUser(body.username);
+  @Get()
+  findAll() {
+    return this.userService.findAll()
+  }
 
-    return {
-      message: 'User deleted',
-    };
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.userService.findOne(id)
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() data: UpdateUserDto) {
+    return this.userService.update(id, data)
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.userService.remove(+id)
   }
 }

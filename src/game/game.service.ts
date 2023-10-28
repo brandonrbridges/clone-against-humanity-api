@@ -1,161 +1,319 @@
-// Types
-import type { Game } from '@prisma/client';
-
 // Nest
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 
-// Prisma
-import { PrismaService } from 'src/prisma/prisma.service';
+// TypeORM
+import { Repository } from 'typeorm'
+import { InjectRepository } from '@nestjs/typeorm'
 
-// Gateways
-import { GameGateway } from './game.gateway';
+// Service
+import { CardService } from 'src/card/card.service'
+import { UserService } from 'src/user/user.service'
 
-// Dtos
-import { CreateGameDto } from './dtos/create-game.dto';
+// Gateway
+import { GameGateway } from './game.gateway'
+
+// Entities
+import { Game } from './entities/game.entity'
+import { GameRound } from './entities/round.entity'
+
+// DTOs
+import { CreateGameDto } from './dto/create-game.dto'
+import { JoinGameDto } from './dto/join-game.dto'
+import { LeaveGameDto } from './dto/leave-game.dto'
+import { UpdateGameDto } from './dto/update-game.dto'
+import { User } from 'src/user/entities/user.entity'
 
 @Injectable()
 export class GameService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Game) private gameRepo: Repository<Game>,
+    @InjectRepository(GameRound) private roundRepo: Repository<GameRound>,
+
     private readonly gameGateway: GameGateway,
+
+    private readonly cardService: CardService,
+    private readonly userService: UserService,
   ) {}
 
-  async getAllGames(): Promise<Game[]> {
-    return await this.prisma.client.game.findMany({
-      include: {
-        players: true,
-      },
-    });
+  async create(data: CreateGameDto): Promise<Game> {
+    const game = await this.gameRepo.save(data)
+
+    this.gameGateway.server.emit('game_created', game)
+
+    return game
   }
 
-  async getGame(id: string): Promise<Game> {
-    const game = await this.prisma.client.game.findUnique({
-      where: {
-        id: id,
-      },
-      include: {
-        players: true,
-      },
-    });
+  async findAll(): Promise<Game[]> {
+    const games = await this.gameRepo.find({ relations: ['players', 'rounds'] })
 
-    return game;
+    return games
   }
 
-  async createGame(data: CreateGameDto, ipAddress: string): Promise<Game> {
-    const player = await this.prisma.client.player.create({
-      data: {
-        username: data.user.username,
-        ipAddress: ipAddress,
-        host: true,
-        game: {
-          create: {
-            name: data.name,
-            inviteCode: data.inviteCode,
-            rounds: data.rounds,
-            maxPlayers: data.maxPlayers,
-          },
-        },
-      },
-      include: {
-        game: {
-          include: {
-            players: true,
-          },
-        },
-      },
-    });
+  async findOne(id: string): Promise<Game> {
+    const game = await this.gameRepo.findOne({
+      where: { id },
+      relations: ['players', 'rounds'],
+    })
 
-    this.gameGateway.server.emit('gameCreated', player.game);
-
-    return player.game;
+    return game
   }
 
-  async leaveGame(gameId: string, username: string): Promise<Game> {
-    const game = await this.prisma.client.game.findUnique({
-      where: {
-        id: gameId,
-      },
-      include: {
-        players: true,
-      },
-    });
+  async update(id: string, data: UpdateGameDto): Promise<Game> {
+    const game = await this.findOne(id)
 
-    const player = game.players.find((player) => player.username === username);
-
-    if (player.host) {
-      await this.prisma.client.game.delete({
-        where: {
-          id: gameId,
-        },
-      });
-
-      this.gameGateway.server.emit('gameDeleted', gameId);
-    } else {
-      await this.prisma.client.player.update({
-        where: {
-          id: player.id,
-        },
-        data: {
-          connected: false,
-        },
-      });
-
-      this.gameGateway.server.emit('gameUpdated', game);
-      this.gameGateway.server.to(gameId).emit('playerLeft', player);
+    if (!game) {
+      throw new Error('Game not found')
     }
 
-    return game;
+    await this.gameRepo.update(id, data)
+
+    this.gameGateway.server.emit('game_updated', game)
+
+    return game
   }
 
-  async joinGame(
-    gameId: string,
-    username: string,
-    ipAddress: string,
+  async playerJoin(id: string, data: JoinGameDto): Promise<Game> {
+    const game = await this.findOne(id)
+
+    if (!game) {
+      throw new NotFoundException('Game not found')
+    }
+
+    if (game?.players?.length >= game.max_players) {
+      throw new BadRequestException('Game is full')
+    }
+
+    const player = await this.userService.findOne(data.player_id)
+
+    game.players.push(player)
+
+    await this.gameRepo.save(game)
+
+    this.gameGateway.server.emit('game_updated', game)
+
+    return game
+  }
+
+  async playerLeave(id: string, data: LeaveGameDto) {
+    const game = await this.findOne(id)
+
+    if (!game) {
+      throw new NotFoundException('Game not found')
+    }
+
+    const player = await this.userService.findOne(data.player_id)
+
+    game.players = game.players.filter((p) => p.id !== player.id)
+
+    await this.gameRepo.save(game)
+
+    this.gameGateway.server.emit('game_updated', game)
+
+    return game
+  }
+
+  async startGame(id: string, data: { player_id: string }): Promise<Game> {
+    const game = await this.findOne(id)
+
+    if (!game) {
+      throw new NotFoundException('Game not found')
+    }
+
+    if (game.players.length < 2) {
+      throw new BadRequestException('Not enough players')
+    }
+
+    if (game.host !== data.player_id) {
+      throw new BadRequestException('You are not the host')
+    }
+
+    const round = await this.roundRepo.save({
+      game_id: game.id,
+      number: 1,
+      czar_id: game.players[0].id,
+    })
+
+    game.rounds.push(round)
+
+    await this.gameRepo.save(game)
+
+    this.gameGateway.server.emit('game_updated', game)
+
+    return game
+  }
+
+  async selectBlackCard(
+    id: string,
+    data: {
+      player_id: string
+      card_id: string
+    },
   ): Promise<Game> {
-    let game = await this.prisma.client.game.findUnique({
-      where: {
-        id: gameId,
-      },
-      include: {
-        players: true,
-      },
-    });
+    const game = await this.findOne(id)
 
-    let player = game.players.find((player) => player.username === username);
-
-    if (player) {
-      await this.prisma.client.player.update({
-        where: {
-          id: player.id,
-        },
-        data: {
-          connected: true,
-        },
-      });
-    } else {
-      const user = await this.prisma.client.user.findUnique({
-        where: {
-          username: username,
-        },
-      });
-
-      player = await this.prisma.client.player.create({
-        data: {
-          username: user.username,
-          email: user.email,
-          ipAddress: ipAddress,
-          game: {
-            connect: {
-              id: gameId,
-            },
-          },
-        },
-      });
+    if (!game) {
+      throw new NotFoundException('Game not found')
     }
 
-    this.gameGateway.server.emit('gameUpdated', game);
-    this.gameGateway.server.to(gameId).emit('playerJoined', player);
+    const round = game.rounds[game.rounds.length - 1]
 
-    return game;
+    if (round.czar_id !== data.player_id) {
+      throw new BadRequestException('You are not the czar')
+    }
+
+    const card = await this.cardService.findOne(data.card_id)
+    const player = await this.userService.findOne(data.player_id)
+
+    round.black_card = {
+      ...card,
+      player_id: player.id,
+      player_name: player.username,
+    }
+
+    await this.roundRepo.save(round)
+
+    this.gameGateway.server.emit('game_updated', game)
+
+    return game
+  }
+
+  async selectWhiteCard(
+    id: string,
+    data: {
+      player_id: string
+      card_id: string
+    },
+  ): Promise<Game> {
+    const game = await this.findOne(id)
+
+    if (!game) {
+      throw new NotFoundException('Game not found')
+    }
+
+    const round = game.rounds[game.rounds.length - 1]
+
+    if (round.czar_id === data.player_id) {
+      throw new BadRequestException('You are the czar')
+    }
+
+    const card = await this.cardService.findOne(data.card_id)
+    const player = await this.userService.findOne(data.player_id)
+
+    const cards = round.white_cards || []
+
+    cards.push({
+      ...card,
+      player_id: player.id,
+      player_name: player.username,
+    })
+
+    round.white_cards = cards
+
+    await this.roundRepo.save(round)
+
+    this.gameGateway.server.emit('game_updated', game)
+
+    return game
+  }
+
+  async selectWinningCard(id: string, card_id: string): Promise<Game> {
+    const game = await this.findOne(id)
+
+    if (!game) {
+      throw new NotFoundException('Game not found')
+    }
+
+    const round = game.rounds[game.rounds.length - 1]
+
+    const card = round.white_cards.find((c) => c.id === card_id)
+
+    round.winning_card = {
+      ...card,
+    }
+
+    await this.roundRepo.save(round)
+
+    this.gameGateway.server.emit('game_updated', game)
+
+    return game
+  }
+
+  async startNewRound(id: string): Promise<Game> {
+    const game = await this.findOne(id)
+
+    if (!game) {
+      throw new NotFoundException('Game not found')
+    }
+
+    const round = game.rounds[game.rounds.length - 1]
+
+    const czarIndex = game.players.findIndex((p) => p.id === round.czar_id)
+
+    const nextCzarIndex =
+      czarIndex + 1 >= game.players.length ? 0 : czarIndex + 1
+
+    const nextCzar = game.players[nextCzarIndex]
+
+    const newRound = await this.roundRepo.save({
+      game_id: game.id,
+      number: round.number + 1,
+      czar_id: nextCzar.id,
+    })
+
+    game.rounds.push(newRound)
+
+    await this.gameRepo.save(game)
+
+    this.gameGateway.server.emit('game_updated', game)
+
+    return game
+  }
+
+  async endGame(id: string): Promise<Game> {
+    const game = await this.findOne(id)
+
+    if (!game) {
+      throw new NotFoundException('Game not found')
+    }
+
+    // calculate winner
+    const scoreMap = new Map<string, number>()
+
+    for (const round of game.rounds) {
+      if (round.winning_card) {
+        const winnerId = round.winning_card.player_id
+        const currentScore = scoreMap.get(winnerId) || 0
+
+        scoreMap.set(winnerId, currentScore + 1)
+      }
+    }
+
+    let topScore = 0
+    let winnerId = ''
+
+    for (const [playerId, score] of scoreMap) {
+      if (score > topScore) {
+        topScore = score
+        winnerId = playerId
+      }
+    }
+
+    game.winner = winnerId
+
+    await this.gameRepo.save(game)
+
+    this.gameGateway.server.emit('game_updated', game)
+
+    return game
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.gameRepo.delete(id)
+
+    return
   }
 }

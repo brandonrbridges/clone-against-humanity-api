@@ -1,92 +1,46 @@
-// Types
-import type { Game } from '@prisma/client';
-
 // Nest
 import {
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-} from '@nestjs/websockets';
+} from '@nestjs/websockets'
 
 // Socket
-import { Server, Socket } from 'socket.io';
+import { Server, Socket } from 'socket.io'
+import { Game } from './entities/game.entity'
 
-@WebSocketGateway()
-export class GameGateway {
-  @WebSocketServer() server: Server;
+@WebSocketGateway({
+  cors: {
+    origin: '*',
+  },
+})
+export class GameGateway implements OnGatewayInit {
+  @WebSocketServer() server: Server
 
-  users: number = 0;
-
-  private gameRooms: Map<string, string[]> = new Map();
+  afterInit() {
+    console.log('GameGateway initialized')
+  }
 
   async handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
-
-    this.users++;
-
-    this.server.emit('users', this.users);
+    console.log('Client connected: ' + client.id)
   }
 
   async handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
-
-    const gameId = client.handshake.query.gameId as string;
-
-    if (gameId) {
-      this.leaveGameRoom(client, gameId);
-    }
-
-    this.users--;
-
-    this.server.emit('users', this.users);
+    console.log('Client disconnected: ' + client.id)
   }
 
-  @SubscribeMessage('gameCreated')
-  handleGameCreated(client: Socket, game: Game) {
-    this.server.emit('gameCreated', game);
+  @SubscribeMessage('message')
+  async handlePing(client: Socket) {
+    console.log('Client pinged: ' + client.id)
+
+    client.emit('message', {
+      message: 'pong',
+    })
   }
 
-  @SubscribeMessage('gameDeleted')
-  handleGameDeleted(client: Socket, game: Game) {
-    this.server.emit('gameDeleted', game);
-  }
-
-  @SubscribeMessage('gameUpdated')
-  handleGameUpdated(client: Socket, game: Game) {
-    this.server.emit('gameUpdated', game);
-  }
-
-  private joinGameRoom(client: Socket, gameId: string) {
-    const clientsInGame = this.gameRooms.get(gameId) || [];
-
-    clientsInGame.push(client.id);
-
-    this.gameRooms.set(gameId, clientsInGame);
-
-    client.join(gameId);
-  }
-
-  private leaveGameRoom(client: Socket, gameId: string) {
-    const clientsInGame = this.gameRooms.get(gameId) || [];
-
-    const updatedClients = clientsInGame.filter((id) => id !== client.id);
-
-    this.gameRooms.set(gameId, updatedClients);
-
-    client.leave(gameId);
-  }
-
-  @SubscribeMessage('joinGame')
-  handleJoinGame(client: Socket, gameId: string) {
-    console.log(`Client ${client.id} joining game ${gameId}`);
-
-    this.joinGameRoom(client, gameId);
-  }
-
-  @SubscribeMessage('leaveGame')
-  handleLeaveGame(client: Socket, gameId: string) {
-    console.log(`Client ${client.id} leaving game ${gameId}`);
-
-    this.leaveGameRoom(client, gameId);
+  @SubscribeMessage('create_game')
+  handleCreateGame(client: Socket, game: Game) {
+    this.server.emit('game_created', game)
   }
 }
