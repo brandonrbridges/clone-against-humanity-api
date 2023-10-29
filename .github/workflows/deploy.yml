@@ -29,6 +29,8 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
+            docker container prune -f
+            docker image prune -a -f
             docker pull ${{ secrets.DOCKER_USERNAME }}/clone-api:latest
             docker stop clone-api || true
             docker rm clone-api || true
