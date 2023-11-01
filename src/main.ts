@@ -3,10 +3,20 @@ import { NestFactory } from '@nestjs/core'
 
 // Modules
 import { AppModule } from './app.module'
+import { readFileSync } from 'fs'
 import { IoAdapter } from '@nestjs/platform-socket.io'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule)
+  const httpsOptions = {
+    key: readFileSync(
+      '/etc/letsencrypt/live/api.cloneagainsthumanity.com/privkey.pem',
+    ),
+    cert: readFileSync(
+      '/etc/letsencrypt/live/api.cloneagainsthumanity.com/fullchain.pem',
+    ),
+  }
+
+  const app = await NestFactory.create(AppModule, { httpsOptions })
 
   app.enableCors({
     origin: [
