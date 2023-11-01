@@ -17,7 +17,7 @@ import { CardModule } from './card/card.module'
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
+      host: 'clone-against-humanity-db',
       port: 5432,
       username: 'postgres',
       password: 'postgres',
