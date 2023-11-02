@@ -10,7 +10,6 @@ import { UserService } from 'src/user/user.service'
 // DTOs
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
-import { Request } from 'express'
 
 @Injectable()
 export class AuthService {

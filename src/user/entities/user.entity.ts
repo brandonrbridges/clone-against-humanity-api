@@ -34,6 +34,15 @@ export class User {
   @ManyToMany(() => Game, (game) => game.players)
   games: Game[]
 
+  @Column({
+    type: 'simple-array',
+    enum: ['USER', 'MODERATOR', 'ADMINISTRATOR'],
+    default: ['USER'],
+    array: true,
+    nullable: true,
+  })
+  roles: string[]
+
   @CreateDateColumn()
   created_at: Date
 }
