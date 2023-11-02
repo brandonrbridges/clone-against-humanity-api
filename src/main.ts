@@ -7,23 +7,24 @@ import { readFileSync } from 'fs'
 import { IoAdapter } from '@nestjs/platform-socket.io'
 
 async function bootstrap() {
-  const httpsOptions = {
-    key: readFileSync(
-      '/etc/letsencrypt/live/api.cloneagainsthumanity.com/privkey.pem',
-    ),
-    cert: readFileSync(
-      '/etc/letsencrypt/live/api.cloneagainsthumanity.com/fullchain.pem',
-    ),
-  }
+  const httpsOptions =
+    process.env.NODE_ENV === 'production'
+      ? {
+          key: readFileSync(
+            '/etc/letsencrypt/live/api.cloneagainsthumanity.com/privkey.pem',
+          ),
+          cert: readFileSync(
+            '/etc/letsencrypt/live/api.cloneagainsthumanity.com/fullchain.pem',
+          ),
+        }
+      : null
 
-  const app = await NestFactory.create(AppModule, { httpsOptions })
+  const app = await NestFactory.create(AppModule, {
+    httpsOptions,
+  })
 
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://192.168.1.126:3000',
-      'https://cloneagainsthumanity.com',
-    ],
+    origin: '*',
   })
 
   app.useWebSocketAdapter(new IoAdapter(app))

@@ -8,6 +8,8 @@ import {
 
 // Socket
 import { Server, Socket } from 'socket.io'
+
+// Entities
 import { Game } from './entities/game.entity'
 
 @WebSocketGateway({
@@ -19,7 +21,7 @@ export class GameGateway implements OnGatewayInit {
   @WebSocketServer() server: Server
 
   afterInit() {
-    console.log('GameGateway initialized')
+    // console.log('GameGateway initialized')
   }
 
   async handleConnection(client: Socket) {

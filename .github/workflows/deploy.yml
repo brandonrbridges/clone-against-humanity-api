@@ -53,5 +53,6 @@ jobs:
             docker run -d --name ${{ secrets.DOCKER_CONTAINER }} --restart unless-stopped \
             --link ${{ secrets.DOCKER_DATABASE }}:db \
             -p 443:4000 \
+            -e NODE_ENV=production \
             -v /etc/letsencrypt:/etc/letsencrypt \
             ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_CONTAINER }}:latest

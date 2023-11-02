@@ -25,7 +25,6 @@ import { CreateGameDto } from './dto/create-game.dto'
 import { JoinGameDto } from './dto/join-game.dto'
 import { LeaveGameDto } from './dto/leave-game.dto'
 import { UpdateGameDto } from './dto/update-game.dto'
-import { User } from 'src/user/entities/user.entity'
 
 @Injectable()
 export class GameService {

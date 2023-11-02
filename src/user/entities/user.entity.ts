@@ -21,9 +21,15 @@ export class User {
   username: string
 
   @Column({
-    default: true,
+    nullable: true,
   })
-  temporary: boolean
+  password: string
+
+  @Column({
+    unique: true,
+    nullable: true,
+  })
+  email: string
 
   @ManyToMany(() => Game, (game) => game.players)
   games: Game[]

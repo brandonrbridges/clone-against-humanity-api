@@ -12,12 +12,22 @@ import { User } from './entities/user.entity'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 
+// Modules
+import * as argon from 'argon2'
+
 @Injectable()
 export class UserService {
   constructor(@InjectRepository(User) private userRepo: Repository<User>) {}
 
   async create(data: CreateUserDto): Promise<User> {
-    const user = await this.userRepo.save(data)
+    const hashed = await argon.hash(data.password)
+
+    console.log(hashed)
+
+    const user = await this.userRepo.save({
+      ...data,
+      password: hashed,
+    })
 
     return user
   }
@@ -44,6 +54,20 @@ export class UserService {
     return user
   }
 
+  async findOneByUsernameOrEmail({
+    username,
+    email,
+  }: {
+    username: string
+    email: string
+  }): Promise<User> {
+    const user = await this.userRepo.findOne({
+      where: [{ username }, { email }],
+    })
+
+    return user
+  }
+
   async update(id: string, data: UpdateUserDto) {
     const user = await this.findOne(id)
 
@@ -56,9 +80,18 @@ export class UserService {
     return user
   }
 
-  async remove(id: number): Promise<void> {
-    await this.userRepo.delete(id)
+  async hashPassword(password: string): Promise<string> {
+    const hashed = await argon.hash(password)
 
-    return
+    return hashed
+  }
+
+  async verifyPassword(
+    password: string,
+    hashedPassword: string,
+  ): Promise<boolean> {
+    const match = await argon.verify(hashedPassword, password)
+
+    return match
   }
 }

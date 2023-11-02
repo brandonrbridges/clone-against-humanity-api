@@ -6,7 +6,6 @@ import {
   Body,
   Patch,
   Param,
-  Delete,
   BadRequestException,
 } from '@nestjs/common'
 
@@ -26,10 +25,6 @@ export class UserController {
 
   @Post()
   async create(@Body() data: CreateUserDto): Promise<User> {
-    const exists = await this.userService.findOneByUsername(data.username)
-
-    if (exists) throw new BadRequestException('User already exists')
-
     return this.userService.create(data)
   }
 
@@ -46,10 +41,5 @@ export class UserController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() data: UpdateUserDto) {
     return this.userService.update(id, data)
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(+id)
   }
 }

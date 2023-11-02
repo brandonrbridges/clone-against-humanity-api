@@ -6,9 +6,15 @@ import { ConfigModule } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
 // Modules
-import { UserModule } from './user/user.module'
-import { GameModule } from './game/game.module'
+import { AuthModule } from './auth/auth.module'
 import { CardModule } from './card/card.module'
+import { GameModule } from './game/game.module'
+import { UserModule } from './user/user.module'
+
+const HOST =
+  process.env.NODE_ENV === 'production'
+    ? 'clone-against-humanity-db'
+    : 'localhost'
 
 @Module({
   imports: [
@@ -17,7 +23,7 @@ import { CardModule } from './card/card.module'
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'clone-against-humanity-db',
+      host: HOST,
       port: 5432,
       username: 'postgres',
       password: 'postgres',
@@ -26,9 +32,10 @@ import { CardModule } from './card/card.module'
       synchronize: true,
       // logging: true,
     }),
-    UserModule,
-    GameModule,
+    AuthModule,
     CardModule,
+    GameModule,
+    UserModule,
   ],
 })
 export class AppModule {}
