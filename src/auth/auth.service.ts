@@ -79,7 +79,9 @@ export class AuthService {
     return user
   }
 
-  async validate(data: any): Promise<any> {}
+  async validate(data: any): Promise<any> {
+    return data
+  }
 
-  async logout(data: any): Promise<any> {}
+  // async logout(data: any): Promise<any> {}
 }
